@@ -1,0 +1,49 @@
+MODULE main
+
+VAR
+  estado : {disponible, agotado, vencido};
+  stock  : 0..500;
+  dias   : 0..365;
+  salida : 0..10;
+
+ASSIGN
+  init(estado) := disponible;
+  init(stock)  := 500;
+  init(dias)   := 365;
+
+  -- salida no tiene valor fijo: NuSMV prueba todas las cantidades de 0 a 10
+  next(estado) :=
+    case
+      (estado = disponible & salida >= stock) : agotado;
+      (estado = disponible & dias = 1)        : vencido;
+      (estado = agotado)                      : disponible;
+      (estado = vencido)                      : disponible;
+      TRUE                                    : estado;
+    esac;
+
+  next(stock) :=
+    case
+      (estado = disponible & salida >= stock) : 0;
+      (estado = disponible)                   : stock - salida;
+      (estado = agotado | estado = vencido)   : 500;
+      TRUE                                    : stock;
+    esac;
+
+  next(dias) :=
+    case
+      (estado = disponible & dias > 1)        : dias - 1;
+      (estado = disponible & dias = 1)        : 0;
+      (estado = agotado | estado = vencido)   : 365;
+      TRUE                                    : dias;
+    esac;
+
+-- R1 un lote agotado tiene stock cero
+LTLSPEC G (estado = agotado -> stock = 0)
+-- R2 un lote disponible tiene unidades
+LTLSPEC G (estado = disponible -> stock > 0)
+-- R3 un lote vencido conserva unidades sin dispensar
+LTLSPEC G (estado = vencido -> stock > 0)
+-- R4 todo lote llega en algun momento a agotado o vencido
+LTLSPEC F (estado = agotado | estado = vencido)
+-- R5 solo se puede dispensar de un lote que aun no vence
+LTLSPEC G (estado = disponible -> dias > 0)
