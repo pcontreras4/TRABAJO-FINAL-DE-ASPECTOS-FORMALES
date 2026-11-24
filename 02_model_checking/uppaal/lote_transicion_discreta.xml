@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE nta PUBLIC '-//Uppaal Team//DTD Flat System 1.6//EN' 'http://www.it.uu.se/research/group/darts/uppaal/flat-1_6.dtd'>
+<nta>
+	<declaration>// Sistema de transicion DISCRETO del lote (mismo modelo que medicamento.smv)
+// Cada transicion representa un dia. No hay reloj: el tiempo se cuenta con "dias".
+
+int[0, 500] stock = 500;   // unidades del lote
+int[0, 365] dias  = 365;   // dias de vigencia restantes</declaration>
+	<template>
+		<name x="5" y="5">LoteDiscreto</name>
+		<declaration>// Disponible: stock &gt; 0, dias &gt; 0
+// Agotado:    stock = 0
+// Vencido:    dias = 0, stock &gt; 0
+// Las ubicaciones son urgentes: el tiempo no se detiene en ellas,
+// asi cada paso obliga a tomar una transicion (un dia), igual que en NuSMV.</declaration>
+		<location id="id0" x="0" y="0">
+			<name x="25" y="-34">Disponible</name>
+			<urgent/>
+		</location>
+		<location id="id1" x="-306" y="272">
+			<name x="-340" y="289">Agotado</name>
+			<urgent/>
+		</location>
+		<location id="id2" x="306" y="272">
+			<name x="280" y="289">Vencido</name>
+			<urgent/>
+		</location>
+		<init ref="id0"/>
+		<transition id="id3">
+			<source ref="id0"/>
+			<target ref="id0"/>
+			<label kind="select" x="-127" y="-195">salida : int[0, 10]</label>
+			<label kind="guard" x="-127" y="-178">salida &lt; stock &amp;&amp; dias &gt; 1</label>
+			<label kind="assignment" x="-127" y="-161">stock = stock - salida, dias = dias - 1</label>
+			<nail x="-42" y="-110"/>
+			<nail x="42" y="-110"/>
+		</transition>
+		<transition id="id4">
+			<source ref="id0"/>
+			<target ref="id1"/>
+			<label kind="select" x="-212" y="153">salida : int[0, 10]</label>
+			<label kind="guard" x="-212" y="170">salida &gt;= stock</label>
+			<label kind="assignment" x="-212" y="195">stock = 0, dias = dias - 1</label>
+			<nail x="-170" y="68"/>
+		</transition>
+		<transition id="id5">
+			<source ref="id0"/>
+			<target ref="id2"/>
+			<label kind="select" x="85" y="195">salida : int[0, 10]</label>
+			<label kind="guard" x="85" y="144">dias == 1 &amp;&amp; salida &lt; stock</label>
+			<label kind="assignment" x="85" y="170">stock = stock - salida, dias = 0</label>
+			<nail x="170" y="68"/>
+		</transition>
+		<transition id="id6">
+			<source ref="id1"/>
+			<target ref="id0"/>
+			<label kind="assignment" x="-544" y="42">stock = 500, dias = 365</label>
+			<nail x="-408" y="136"/>
+			<nail x="-238" y="-17"/>
+		</transition>
+		<transition id="id7">
+			<source ref="id2"/>
+			<target ref="id0"/>
+			<label kind="assignment" x="331" y="17">stock = 500, dias = 365</label>
+			<nail x="408" y="136"/>
+			<nail x="238" y="-17"/>
+		</transition>
+	</template>
+	<system>// Instancia del lote
+Lote = LoteDiscreto();
+
+system Lote;</system>
+	<queries>
+		<query>
+			<formula>A[] (Lote.Agotado imply stock == 0)</formula>
+			<comment>R1: un lote agotado tiene stock cero</comment>
+		</query>
+		<query>
+			<formula>A[] (Lote.Disponible imply stock &gt; 0)</formula>
+			<comment>R2: un lote disponible tiene unidades</comment>
+		</query>
+		<query>
+			<formula>A[] (Lote.Vencido imply stock &gt; 0)</formula>
+			<comment>R3: un lote vencido conserva unidades sin dispensar</comment>
+		</query>
+		<query>
+			<formula>A&lt;&gt; (Lote.Agotado or Lote.Vencido)</formula>
+			<comment>R4: todo lote llega en algun momento a agotado o vencido</comment>
+		</query>
+		<query>
+			<formula>A[] (Lote.Disponible imply dias &gt; 0)</formula>
+			<comment>R5: solo se dispensa de un lote que aun no vence</comment>
+		</query>
+		<query>
+			<formula>A[] not deadlock</formula>
+			<comment>El modelo nunca se bloquea</comment>
+		</query>
+	</queries>
+</nta>
