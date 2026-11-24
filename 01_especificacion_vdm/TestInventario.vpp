@@ -1,0 +1,94 @@
+class TestInventario
+
+instance variables
+  inv0 : Inventario := new Inventario(20261013);
+  qf   : Inventario`Responsable := mk_token("QF Ramos");
+  otro : Inventario`Responsable := mk_token("Sin autorizacion");
+
+operations
+  -- Escenario base: 2 medicamentos, 3 lotes y 1 responsable
+  public Preparar : () ==> ()
+  Preparar() ==
+  ( inv0 := new Inventario(20261013);
+    inv0.RegistrarMedicamento(
+      mk_Inventario`Medicamento("PARA500", "Paracetamol 500 mg", <TABLETA>, 20));
+    inv0.RegistrarMedicamento(
+      mk_Inventario`Medicamento("AMOX250", "Amoxicilina 250 mg", <JARABE>, 5));
+    inv0.RegistrarResponsable(qf);
+    inv0.RegistrarIngreso("L001", "PARA500", 20270630, 100);
+    inv0.RegistrarIngreso("L002", "PARA500", 20261215, 30);
+    inv0.RegistrarIngreso("L003", "AMOX250", 20261101, 4)
+  );
+
+  -- Casos positivos: cada resultado debe ser true
+  public Ejecutar : () ==> seq of (seq1 of char * bool)
+  Ejecutar() ==
+  ( dcl r : seq of (seq1 of char * bool) := [];
+    Preparar();
+
+    -- T1 el stock es la suma de los lotes
+    r := r ^ [mk_("T1 stock inicial",
+                  inv0.StockTotal("PARA500") = 130 and
+                  inv0.StockTotal("AMOX250") = 4)];
+
+    -- T2 una dispensacion valida descuenta el lote y queda en el historial
+    inv0.Dispensar("L001", 10, qf);
+    r := r ^ [mk_("T2 dispensar 10 de L001",
+                  inv0.StockTotal("PARA500") = 120 and
+                  len inv0.GetHistorial() = 1)];
+
+    -- T3 estado disponible y alerta de stock bajo
+    r := r ^ [mk_("T3 disponible y stock bajo",
+                  inv0.EstadoDe("L001") = <DISPONIBLE> and
+                  inv0.StockBajo("AMOX250") and
+                  not inv0.StockBajo("PARA500"))];
+
+    -- T4 al pasar el tiempo los lotes vencen sin modificar su registro
+    inv0.AvanzarFecha(20261216);
+    r := r ^ [mk_("T4 vencimiento por paso del tiempo",
+                  inv0.EstadoDe("L002") = <VENCIDO> and
+                  inv0.EstadoDe("L003") = <VENCIDO> and
+                  inv0.StockTotal("PARA500") = 120)];
+
+    -- T5 un lote agotado se conserva para la trazabilidad
+    inv0.Dispensar("L001", 90, qf);
+    r := r ^ [mk_("T5 lote agotado",
+                  inv0.EstadoDe("L001") = <AGOTADO> and
+                  len inv0.GetHistorial() = 2)];
+
+    return r
+  );
+
+  -- Casos negativos: cada uno debe terminar en error
+
+  -- N1 dispensar de un lote vencido
+  public N1 : () ==> ()
+  N1() == ( Preparar(); inv0.AvanzarFecha(20261216); inv0.Dispensar("L002", 1, qf) );
+
+  -- N2 dispensar mas unidades de las que tiene el lote
+  public N2 : () ==> ()
+  N2() == ( Preparar(); inv0.Dispensar("L003", 5, qf) );
+
+  -- N3 dispensar con un responsable no autorizado
+  public N3 : () ==> ()
+  N3() == ( Preparar(); inv0.Dispensar("L001", 1, otro) );
+
+  -- N4 ingresar un lote ya vencido
+  public N4 : () ==> ()
+  N4() == ( Preparar(); inv0.RegistrarIngreso("L004", "PARA500", 20260101, 10) );
+
+  -- N5 ingresar un lote de un medicamento no registrado
+  public N5 : () ==> ()
+  N5() == ( Preparar(); inv0.RegistrarIngreso("L004", "IBU400", 20270101, 10) );
+
+  -- N6 medicamento con nombre de solo espacios
+  public N6 : () ==> ()
+  N6() == ( Preparar();
+            inv0.RegistrarMedicamento(
+              mk_Inventario`Medicamento("IBU400", "   ", <TABLETA>, 1)) );
+
+  -- N7 fecha imposible (mes 13)
+  public N7 : () ==> ()
+  N7() == ( Preparar(); inv0.RegistrarIngreso("L004", "PARA500", 20271399, 10) );
+
+end TestInventario

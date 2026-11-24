@@ -1,0 +1,153 @@
+class Inventario
+
+types
+  -- Codigos de medicamento y de lote: cadenas no vacias
+  public CodMed = seq1 of char;
+  public IdLote = seq1 of char;
+
+  -- Responsable de la dispensacion: solo se compara por igualdad
+  public Responsable = token;
+
+  -- Fecha en formato AAAAMMDD: el orden numerico es el orden cronologico
+  public Fecha = nat
+    inv f == f >= 19000101 and f <= 29991231 and
+             (f div 100) mod 100 in set {1,...,12} and
+             f mod 100 in set {1,...,31};
+
+  -- Valores cerrados (tipos quote)
+  public FormaFarmaceutica = <TABLETA> | <CAPSULA> | <JARABE> | <INYECTABLE> | <OTRA>;
+  public EstadoLote = <DISPONIBLE> | <AGOTADO> | <VENCIDO>;
+
+  -- Medicamento del catalogo: el nombre debe tener algun caracter visible
+  public Medicamento ::
+    codigo      : CodMed
+    nombre      : seq1 of char
+    forma       : FormaFarmaceutica
+    stockMinimo : nat
+  inv m == exists c in set elems m.nombre & c <> ' ';
+
+  -- Lote: partida de un medicamento con su vencimiento
+  public Lote ::
+    id        : IdLote
+    med       : CodMed
+    fechaVenc : Fecha
+    cantidad  : nat;
+
+  -- Dispensacion: registro de cada salida de unidades
+  public Dispensacion ::
+    lote        : IdLote
+    med         : CodMed
+    cantidad    : nat1
+    fecha       : Fecha
+    responsable : Responsable;
+
+instance variables
+  medicamentos : map CodMed to Medicamento := {|->};
+  lotes        : map IdLote to Lote := {|->};
+  historial    : seq of Dispensacion := [];
+  responsables : set of Responsable := {};
+  hoy          : Fecha := 20260101;
+
+  -- I1 cada codigo del catalogo coincide con su registro
+  inv CatalogoCoherente(medicamentos);
+
+  -- I2 cada lote coincide con su clave y pertenece a un medicamento registrado
+  inv LotesCoherentes(lotes, medicamentos);
+
+  -- I3 toda dispensacion se hizo antes del vencimiento de su lote
+  -- y la hizo un responsable autorizado
+  inv DispensacionesSeguras(historial, lotes, responsables);
+
+functions
+  public CatalogoCoherente : map CodMed to Medicamento -> bool
+  CatalogoCoherente(ms) ==
+    forall c in set dom ms & ms(c).codigo = c;
+
+  public LotesCoherentes : (map IdLote to Lote) * (map CodMed to Medicamento) -> bool
+  LotesCoherentes(ls, ms) ==
+    forall i in set dom ls & ls(i).id = i and ls(i).med in set dom ms;
+
+  public DispensacionesSeguras : (seq of Dispensacion) * (map IdLote to Lote) *
+                                 (set of Responsable) -> bool
+  DispensacionesSeguras(h, ls, rs) ==
+    forall d in set elems h &
+      d.lote in set dom ls and
+      d.fecha < ls(d.lote).fechaVenc and
+      d.responsable in set rs;
+
+  -- Estado de un lote: se calcula con la fecha, no se guarda
+  public Estado : Lote * Fecha -> EstadoLote
+  Estado(l, f) ==
+    if l.cantidad = 0 then <AGOTADO>
+    elseif l.fechaVenc <= f then <VENCIDO>
+    else <DISPONIBLE>;
+
+  -- Suma las unidades de un conjunto de lotes
+  public SumaLotes : (set of IdLote) * (map IdLote to Lote) -> nat
+  SumaLotes(ids, ls) ==
+    if ids = {} then 0
+    else let i in set ids in ls(i).cantidad + SumaLotes(ids \ {i}, ls)
+  pre ids subset dom ls;
+
+operations
+  public Inventario : Fecha ==> Inventario
+  Inventario(f) == hoy := f;
+
+  public RegistrarMedicamento : Medicamento ==> ()
+  RegistrarMedicamento(m) ==
+    medicamentos := medicamentos munion {m.codigo |-> m}
+  pre m.codigo not in set dom medicamentos
+  post m.codigo in set dom medicamentos;
+
+  public RegistrarResponsable : Responsable ==> ()
+  RegistrarResponsable(r) ==
+    responsables := responsables union {r}
+  pre r not in set responsables
+  post r in set responsables;
+
+  -- Ingreso de stock: cada compra entra como un lote nuevo
+  public RegistrarIngreso : IdLote * CodMed * Fecha * nat1 ==> ()
+  RegistrarIngreso(id, c, venc, cant) ==
+    lotes := lotes munion {id |-> mk_Lote(id, c, venc, cant)}
+  pre c in set dom medicamentos and
+      id not in set dom lotes and
+      venc > hoy
+  post lotes(id).cantidad = cant;
+
+  -- Operacion critica: solo se dispensa de un lote DISPONIBLE
+  public Dispensar : IdLote * nat1 * Responsable ==> ()
+  Dispensar(id, cant, r) ==
+    let l = lotes(id) in
+    ( lotes := lotes ++ {id |-> mu(l, cantidad |-> l.cantidad - cant)};
+      historial := historial ^ [mk_Dispensacion(id, l.med, cant, hoy, r)] )
+  pre id in set dom lotes and
+      Estado(lotes(id), hoy) = <DISPONIBLE> and
+      lotes(id).cantidad >= cant and
+      r in set responsables
+  post lotes(id).cantidad = lotes~(id).cantidad - cant and
+       len historial = len historial~ + 1;
+
+  -- El tiempo del sistema solo avanza
+  public AvanzarFecha : Fecha ==> ()
+  AvanzarFecha(f) == hoy := f
+  pre f >= hoy
+  post hoy = f;
+
+  -- Consultas
+  public StockTotal : CodMed ==> nat
+  StockTotal(c) ==
+    return SumaLotes({i | i in set dom lotes & lotes(i).med = c}, lotes)
+  pre c in set dom medicamentos;
+
+  public StockBajo : CodMed ==> bool
+  StockBajo(c) == return StockTotal(c) < medicamentos(c).stockMinimo
+  pre c in set dom medicamentos;
+
+  public EstadoDe : IdLote ==> EstadoLote
+  EstadoDe(id) == return Estado(lotes(id), hoy)
+  pre id in set dom lotes;
+
+  public GetHistorial : () ==> seq of Dispensacion
+  GetHistorial() == return historial;
+
+end Inventario
