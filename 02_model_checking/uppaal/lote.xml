@@ -1,0 +1,117 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE nta PUBLIC '-//Uppaal Team//DTD Flat System 1.6//EN' 'http://www.it.uu.se/research/group/darts/uppaal/flat-1_6.dtd'>
+<nta>
+	<declaration>// Reloj continuo para medir la vigencia del lote
+clock t;
+
+// Variables compartidas del inventario
+int[0, 500] stock = 500;
+int[1, 10] cant_solicitada = 1;
+const int VIGENCIA = 365;
+
+// Canales de sincronización entre Farmacéutico y Lote
+chan dispensar;
+chan reponer;</declaration>
+	<template>
+		<name x="5" y="5">Lote</name>
+		<declaration>// Place local declarations here.
+</declaration>
+		<location id="id0" x="-24" y="-246">
+			<name x="8" y="-280">Disponible</name>
+			<label kind="invariant" x="8" y="-263">t &lt;= VIGENCIA &amp;&amp; stock &gt; 0</label>
+		</location>
+		<location id="id1" x="-365" y="76">
+			<name x="-442" y="68">Agotado</name>
+			<label kind="invariant" x="-375" y="93">stock == 0</label>
+		</location>
+		<location id="id2" x="212" y="76">
+			<name x="229" y="68">Vencido</name>
+			<label kind="invariant" x="229" y="93">t &gt;= VIGENCIA &amp;&amp; stock &gt; 0</label>
+		</location>
+		<location id="id3" x="-25" y="-246">
+		</location>
+		<init ref="id0"/>
+		<transition id="id4">
+			<source ref="id0"/>
+			<target ref="id2"/>
+			<label kind="guard" x="76" y="-170">t == VIGENCIA &amp;&amp; stock &gt; 0</label>
+			<nail x="93" y="-161"/>
+			<nail x="170" y="-59"/>
+		</transition>
+		<transition id="id5">
+			<source ref="id2"/>
+			<target ref="id0"/>
+			<label kind="assignment" x="-17" y="25">stock = 500, t = 0</label>
+			<nail x="76" y="-42"/>
+			<nail x="17" y="-127"/>
+		</transition>
+		<transition id="id6">
+			<source ref="id1"/>
+			<target ref="id0"/>
+			<label kind="assignment" x="-280" y="25">stock = 500, t = 0</label>
+			<nail x="-178" y="-51"/>
+			<nail x="-93" y="-144"/>
+		</transition>
+		<transition id="id7">
+			<source ref="id0"/>
+			<target ref="id1"/>
+			<label kind="select" x="-408" y="-221">salida : int[1, 10]</label>
+			<label kind="guard" x="-408" y="-204">stock &lt;= salida &amp;&amp; t &lt; VIGENCIA</label>
+			<label kind="assignment" x="-408" y="-187">stock = 0</label>
+			<nail x="-170" y="-161"/>
+			<nail x="-246" y="-85"/>
+		</transition>
+		<transition id="id8">
+			<source ref="id0"/>
+			<target ref="id0"/>
+			<label kind="select" x="-93" y="-416">salida : int[1, 10]</label>
+			<label kind="guard" x="-93" y="-399">stock &gt; salida &amp;&amp; t &lt; VIGENCIA</label>
+			<label kind="assignment" x="-93" y="-382">stock = stock - salida</label>
+			<nail x="17" y="-348"/>
+			<nail x="-59" y="-348"/>
+		</transition>
+	</template>
+	<system>// Instanciar el proceso del lote
+LoteFarmacia = Lote();
+
+// Definir el sistema a verificar
+system LoteFarmacia;</system>
+	<queries>
+		<option key="--diagnostic" value="0"/>
+		<query>
+			<formula>A[] (LoteFarmacia.Agotado imply stock == 0)</formula>
+			<comment/>
+			<result outcome="success" type="quality" timestamp="2026-11-24 02:42:09 -0500">
+				<option key="--diagnostic" value="0"/>
+			</result>
+		</query>
+		<query>
+			<formula>A[] (LoteFarmacia.Disponible imply stock &gt; 0)</formula>
+			<comment/>
+			<result outcome="success" type="quality" timestamp="2026-11-24 02:42:08 -0500">
+				<option key="--diagnostic" value="0"/>
+			</result>
+		</query>
+		<query>
+			<formula>A[] (LoteFarmacia.Vencido imply stock &gt; 0)</formula>
+			<comment/>
+			<result outcome="success" type="quality" timestamp="2026-11-24 02:42:10 -0500">
+				<option key="--diagnostic" value="0"/>
+			</result>
+		</query>
+		<query>
+			<formula>A&lt;&gt; (LoteFarmacia.Agotado or LoteFarmacia.Vencido)</formula>
+			<comment/>
+			<result outcome="success" type="quality" timestamp="2026-11-24 02:42:14 -0500">
+				<option key="--diagnostic" value="0"/>
+			</result>
+		</query>
+		<query>
+			<formula>A[] (LoteFarmacia.Disponible imply t &lt;= VIGENCIA)</formula>
+			<comment/>
+			<result outcome="success" type="quality" timestamp="2026-11-24 02:42:15 -0500">
+				<option key="--diagnostic" value="0"/>
+			</result>
+		</query>
+	</queries>
+</nta>
