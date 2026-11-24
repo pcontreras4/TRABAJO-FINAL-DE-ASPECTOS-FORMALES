@@ -1,0 +1,47 @@
+Resultados esperados
+
+1. VDM++ (obtenidos con el interprete VDMJ; en VDMTools cambia el texto de los mensajes, no el resultado)
+
+Casos positivos
+[mk_("T1 stock inicial", true),
+ mk_("T2 dispensar 10 de L001", true),
+ mk_("T3 disponible y stock bajo", true),
+ mk_("T4 vencimiento por paso del tiempo", true),
+ mk_("T5 lote agotado", true)]
+
+Casos negativos (cada uno debe terminar en error)
+N1: Precondition failure: pre_Dispensar
+N2: Precondition failure: pre_Dispensar
+N3: Precondition failure: pre_Dispensar
+N4: Precondition failure: pre_RegistrarIngreso
+N5: Precondition failure: pre_RegistrarIngreso
+N6: Type invariant violated by mk_Medicamento
+N7: Type invariant violated for Fecha
+
+2. NuSMV (02_model_checking/nusmv/medicamento.smv)
+-- specification  G (estado = agotado -> stock = 0)  is true
+-- specification  G (estado = disponible -> stock > 0)  is true
+-- specification  G (estado = vencido -> stock > 0)  is true
+-- specification  F (estado = agotado | estado = vencido)  is true
+-- specification  G (estado = disponible -> dias > 0)  is true
+
+Prueba de control: sin la transicion a vencido (se borra esa linea de medicamento.smv)
+-- specification  G (estado = agotado -> stock = 0)  is true
+-- specification  G (estado = disponible -> stock > 0)  is true
+-- specification  G (estado = vencido -> stock > 0)  is true
+-- specification  F (estado = agotado | estado = vencido)  is false
+-- specification  G (estado = disponible -> dias > 0)  is false
+
+3. UPPAAL (02_model_checking/uppaal/lote.xml)
+U1  A[] (LoteFarmacia.Agotado imply stock == 0)              Formula is satisfied
+U2  A[] (LoteFarmacia.Disponible imply stock > 0)            Formula is satisfied
+U3  A[] (LoteFarmacia.Vencido imply stock > 0)               Formula is satisfied
+U4  A<> (LoteFarmacia.Agotado or LoteFarmacia.Vencido)       Formula is satisfied
+U5  A[] (LoteFarmacia.Disponible imply t <= VIGENCIA)        Formula is satisfied
+
+Prueba de control: sin la transicion a Vencido y sin el limite t <= VIGENCIA (lote_control.xml)
+U1  A[] (LoteFarmacia.Agotado imply stock == 0)              Formula is satisfied
+U2  A[] (LoteFarmacia.Disponible imply stock > 0)            Formula is satisfied
+U3  A[] (LoteFarmacia.Vencido imply stock > 0)               Formula is satisfied
+U4  A<> (LoteFarmacia.Agotado or LoteFarmacia.Vencido)       Formula is NOT satisfied
+U5  A[] (LoteFarmacia.Disponible imply t <= VIGENCIA)        Formula is NOT satisfied
